@@ -1,13 +1,13 @@
 # Onionloom
 
-Onionloom is a CPU-first Rust CLI for generating Tor v3 onion vanity addresses. It uses batched Ed25519 point compression, measures the current machine before a search, and writes key directories in Tor's native format.
+Onionloom is a CPU-first Rust CLI for generating Tor v3 onion vanity addresses. It measures the current machine, explains realistic search times in plain language, and writes key directories in Tor's native format.
 
 The project is early but usable. The current backend is CPU only. There is no GPU backend and no GPU performance claim.
 
 ## Why Onionloom
 
 - Pure Rust search and key handling with unsafe code forbidden
-- Automatic worker and batch-size tuning against the requested filter
+- Low, medium, and full power modes with automatic hardware tuning
 - Prefix matching directly against compressed public-key bits
 - Live measured throughput with expected, median, and 95 percent time estimates
 - Exact Tor tagged public and expanded secret-key formats
@@ -34,6 +34,20 @@ The native CPU flag is suitable for a binary used on the build machine. Do not u
 
 ## Search
 
+Check the current computer before starting:
+
+```console
+onionloom evaluate
+```
+
+Estimate a specific name without generating a key:
+
+```console
+onionloom guess loom
+```
+
+Start a search:
+
 ```console
 onionloom search loom
 ```
@@ -51,8 +65,9 @@ onions/
 Useful options:
 
 ```console
+onionloom search loom --power low
+onionloom search loom --power full
 onionloom search loom onion -d ./keys -n 2
-onionloom search loom --workers 8 --batch-size 512
 onionloom search loom --checkpoint /secure/path/loom.checkpoint
 onionloom verify ./keys/loom...onion
 onionloom benchmark --trial-ms 500
@@ -60,7 +75,15 @@ onionloom benchmark --trial-ms 500
 
 Patterns use lowercase `a-z` and digits `2-7`. Onionloom currently accepts prefix patterns up to 51 characters. This limit keeps matching in the fast public-key-only path and keeps the probability model exact.
 
-The default tuner tests five batch sizes and every available logical worker count. Supplying `--workers` or `--batch-size` narrows that work. The measured rate includes the selected pattern filter. Very short trials are more sensitive to scheduler noise, so use a larger `--tune-ms` when stable estimates matter more than startup time.
+Power modes set the range Onionloom may test:
+
+- `low` tests up to roughly one quarter of available CPU processing slots.
+- `medium` tests up to half and is the default for searching, guessing, and evaluating.
+- `full` tests every available CPU processing slot.
+
+Onionloom benchmarks the allowed range and chooses the fastest measured worker count and batch size. A power mode is a worker cap, not a promise of an exact CPU percentage. Operating-system scheduling and other programs still affect CPU use.
+
+Advanced users can replace the power mode with an exact `--workers` count and can set `--batch-size`. Very short tuning trials are more sensitive to scheduler noise, so use a larger `--tune-ms` when stable estimates matter more than startup time.
 
 ## Reading the time estimates
 
@@ -70,7 +93,7 @@ Vanity generation is probabilistic. A displayed median is not a deadline.
 - Median time is when the chance of having found a match reaches 50 percent.
 - The 95 percent estimate is when the chance reaches 95 percent.
 
-The estimates use a geometric distribution, the exact combined probability of the normalized non-overlapping prefixes, and measured candidate throughput from the current run.
+The estimates use a geometric distribution, the exact combined probability of the normalized non-overlapping prefixes, and the measured number of possible addresses tested per second in the current run.
 
 ## Key safety
 
@@ -103,7 +126,7 @@ This is a local engineering measurement, not a universal speed claim.
 | Profile | `release`, thin LTO, one codegen unit |
 | Command | `onionloom benchmark --trial-ms 500` |
 | Selected | 10 workers, batch 1024 |
-| Candidate engine rate | 18.49 million candidates per second |
+| Possible address engine rate | 18.49 million possible addresses per second |
 
 The benchmark measures point generation and batch compression. Search startup measurements additionally include the real compiled filter and are the values used for ETA. No same-machine mkp224o result is published yet because its build prerequisites were not present in the measurement environment.
 

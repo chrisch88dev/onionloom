@@ -43,8 +43,18 @@ pub fn format_duration(duration: Duration) -> String {
     if duration == Duration::MAX {
         return "over platform duration limit".to_owned();
     }
+    if seconds < 0.001 {
+        return format!("{:.0} us", seconds * 1_000_000.0);
+    }
     if seconds < 1.0 {
-        return format!("{:.0} ms", seconds * 1_000.0);
+        let milliseconds = seconds * 1_000.0;
+        if milliseconds < 10.0 {
+            return format!("{milliseconds:.2} ms");
+        }
+        if milliseconds < 100.0 {
+            return format!("{milliseconds:.1} ms");
+        }
+        return format!("{milliseconds:.0} ms");
     }
     if seconds < 60.0 {
         return format!("{seconds:.1} s");
@@ -63,12 +73,21 @@ pub fn format_duration(duration: Duration) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::estimates;
+    use std::time::Duration;
+
+    use super::{estimates, format_duration};
 
     #[test]
     fn geometric_quantiles_are_ordered() {
         let estimate = estimates(1.0 / 32.0_f64.powi(5), 1_000_000.0);
         assert!(estimate.median < estimate.expected);
         assert!(estimate.expected < estimate.p95);
+    }
+
+    #[test]
+    fn short_times_do_not_round_to_zero() {
+        assert_eq!(format_duration(Duration::from_micros(4)), "4 us");
+        assert_eq!(format_duration(Duration::from_micros(4_250)), "4.25 ms");
+        assert_eq!(format_duration(Duration::from_millis(42)), "42.0 ms");
     }
 }

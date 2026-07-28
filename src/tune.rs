@@ -36,13 +36,22 @@ pub struct TuneResult {
     pub worker_measurements: Vec<Measurement>,
 }
 
-/// Benchmarks batch sizes and every available worker count.
-pub fn auto_tune(per_trial: Duration, filters: Option<Arc<FilterSet>>) -> Result<TuneResult> {
+/// Benchmarks batch sizes and every worker count up to the requested limit.
+pub fn auto_tune(
+    per_trial: Duration,
+    filters: Option<Arc<FilterSet>>,
+    max_workers: usize,
+) -> Result<TuneResult> {
     ensure!(
         per_trial >= Duration::from_millis(25),
         "tuning trial must be at least 25 ms"
     );
+    ensure!(
+        max_workers > 0,
+        "automatic tuning needs at least one worker"
+    );
     let logical = std::thread::available_parallelism()?.get();
+    let worker_limit = logical.min(max_workers);
 
     let mut batch_measurements = Vec::with_capacity(BatchSize::ALL.len());
     for batch_size in BatchSize::ALL {
@@ -57,8 +66,8 @@ pub fn auto_tune(per_trial: Duration, filters: Option<Arc<FilterSet>>) -> Result
         .expect("batch sizes are non-empty")
         .batch_size;
 
-    let mut worker_measurements = Vec::with_capacity(logical);
-    for workers in 1..=logical {
+    let mut worker_measurements = Vec::with_capacity(worker_limit);
+    for workers in 1..=worker_limit {
         worker_measurements.push(measure_inner(
             workers,
             best_batch,

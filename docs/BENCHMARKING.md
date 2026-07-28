@@ -2,9 +2,9 @@
 
 Onionloom separates three measurements:
 
-- Candidate engine measures point generation and batch compression.
+- Possible-address engine measures point generation and batch compression.
 - Filtered tuning adds the exact compiled patterns used by a search.
-- Live progress divides completed candidates by search wall time.
+- Live progress divides completed possible addresses by search wall time.
 
 ETA uses filtered tuning at startup and live progress after the search begins.
 
@@ -31,7 +31,7 @@ For each implementation:
 6. Report median, minimum, maximum, and median absolute deviation.
 7. Run an end-to-end test that saves and validates at least one key.
 
-Candidate counters must represent fully compressed public keys presented to the filter. Setup work and found-key validation should be reported separately when they are excluded from the rate.
+Possible-address counters must represent fully compressed public keys presented to the filter. Setup work and found-key validation should be reported separately when they are excluded from the rate.
 
 ## GPU acceptance gate
 
