@@ -102,8 +102,8 @@ This is a local engineering measurement, not a universal speed claim.
 | Rust | 1.95.0 |
 | Profile | `release`, thin LTO, one codegen unit |
 | Command | `onionloom benchmark --trial-ms 500` |
-| Selected | 12 workers, batch 1024 |
-| Candidate engine rate | 19.53 million candidates per second |
+| Selected | 10 workers, batch 1024 |
+| Candidate engine rate | 18.49 million candidates per second |
 
 The benchmark measures point generation and batch compression. Search startup measurements additionally include the real compiled filter and are the values used for ETA. No same-machine mkp224o result is published yet because its build prerequisites were not present in the measurement environment.
 
