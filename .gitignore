@@ -1,0 +1,12 @@
+/target/
+/onions/
+/private/
+/AGENTS.md
+/CLAUDE.md
+*.checkpoint
+*.checkpoint.*
+*.profraw
+*.pem
+*.key
+.DS_Store
+Thumbs.db
