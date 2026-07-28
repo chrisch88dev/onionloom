@@ -17,7 +17,7 @@ jobs:
     name: format and clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -32,7 +32,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --all-targets --locked
       - run: cargo build --release --locked
@@ -41,7 +41,9 @@ jobs:
     name: dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
+      - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@v2.79.11
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tool: cargo-deny
+          fallback: none
+      - run: cargo deny check advisories
