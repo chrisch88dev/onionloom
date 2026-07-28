@@ -15,11 +15,11 @@ anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 ctrlc = "3.4"
 curve25519-dalek = { version = "5.0", features = ["precomputed-tables", "zeroize"] }
-getrandom = "0.3"
+getrandom = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = "0.10"
-sha3 = "0.10"
+sha2 = "0.11"
+sha3 = "0.12"
 zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
