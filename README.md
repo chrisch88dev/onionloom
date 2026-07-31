@@ -17,29 +17,29 @@ Onionloom measures your machine, picks the best CPU configuration, validates com
 
 ## What are .onion addresses?
 
-`.onion` addresses are Tor v3 onion services — the modern standard for anonymous websites and services on the Tor network. Instead of `something.com`, you get an address like `loom4skeblahblahblahblahblahblahblahblah.onion` that routes all traffic through Tor, hiding both the server and the visitor.
+`.onion` addresses are Tor v3 onion services, the modern standard for anonymous websites and services on the Tor network. Instead of `something.com`, you get an address like `loom4skeblahblahblahblahblahblahblahblah.onion` that routes all traffic through Tor, hiding both the server and the visitor.
 
-Onionloom generates the cryptographic key pairs needed to run an onion service. Put the generated files in your Tor daemon's `HiddenServiceDir` and your site is live. You can run anything — a web server, an XMPP chat, a file share, a Bitcoin node.
+Onionloom generates the cryptographic key pairs needed to run an onion service. Put the generated files in your Tor daemon's `HiddenServiceDir` and your site is live. You can run anything: a web server, an XMPP chat, a file share, a Bitcoin node.
 
 And with Onionloom, the beginning of that address says whatever you want.
 
 ## Why Onionloom
 
-- **Paired-coordinate CPU engine** — one field inversion shared across thousands of candidates. Extremely efficient.
-- **Automatic GPU acceleration** — Vulkan, DirectX 12, or Metal. GPU results are independently verified on CPU before any key is saved.
-- **No unsafe Rust** — zero `unsafe` blocks in the entire codebase.
-- **Live throughput** — expected, median, and 95th percentile time estimates updated in real time.
-- **Exact Tor format** — tagged public key, expanded secret, and hostname with full readback validation.
-- **Never overwrites** — existing key directories are refused, never replaced.
-- **OS randomness** — all secrets from the operating system CSPRNG, zeroized after use.
-- **Resumable checkpoints** — stop and resume long searches (opt-in, secret material warning).
-- **Linux-first** — full Windows and macOS support.
+- **Paired-coordinate CPU engine**: one field inversion shared across thousands of candidates. Extremely efficient.
+- **Automatic GPU acceleration**: Vulkan, DirectX 12, or Metal. GPU results are independently verified on CPU before any key is saved.
+- **No unsafe Rust**: zero `unsafe` blocks in the entire codebase.
+- **Live throughput**: expected, median, and 95th percentile time estimates updated in real time.
+- **Exact Tor format**: tagged public key, expanded secret, and hostname with full readback validation.
+- **Never overwrites**: existing key directories are refused, never replaced.
+- **OS randomness**: all secrets from the operating system CSPRNG, zeroized after use.
+- **Resumable checkpoints**: stop and resume long searches (opt-in, secret material warning).
+- **Linux-first**: full Windows and macOS support.
 
 ## Install
 
 ### Pre-built binaries
 
-Download from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases) — just download and run:
+Download from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases). Just download and run:
 
 | Platform | File |
 |----------|------|
@@ -51,7 +51,7 @@ These are generic builds compatible with any machine. Verify with the published 
 
 ### Build from source (faster)
 
-Compiling yourself targets your exact CPU — significantly faster than the generic binaries:
+Compiling yourself targets your exact CPU, significantly faster than the generic binaries:
 
 ```
 git clone https://github.com/chrisch88dev/onionloom
@@ -68,7 +68,7 @@ cargo build --release --locked
 cargo build --release --locked --no-default-features   # CPU-only
 ```
 
-The `--locked` flag pins exact dependency versions from `Cargo.lock`. This gives you the same tested build every time — always use it for reproducible, reliable binaries.
+The `--locked` flag pins exact dependency versions from `Cargo.lock`. This gives you the same tested build every time. Always use it for reproducible, reliable binaries.
 
 ### Cargo
 
@@ -99,9 +99,9 @@ Requires Rust 1.85 or newer.
 
 Control how much CPU Onionloom uses. Default is `full`:
 
-- `low` — leave most CPU free for other work
-- `medium` — balance search and responsiveness
-- `full` — all available cores, no overclocking
+- `low`: leave most CPU free for other work
+- `medium`: balance search and responsiveness
+- `full`: all available cores, no overclocking
 
 ### Using your key
 
@@ -144,11 +144,11 @@ Onionloom uses `curve25519-dalek` for all cryptographic operations. Every genera
 To report a vulnerability:
 
 - [GitHub private vulnerability reporting](https://github.com/chrisch88dev/onionloom/security/advisories/new)
-- Email: [chris@chrisch88.dev](mailto:chris@chrisch88.dev) (PGP: `6A0DC11D3231AF40DCDC75712D4500072620C9BA`)
+- Email: [chris@chrisch88.dev](mailto:chris@chrisch88.dev) (PGP: `946C571F7423FF1E565EE5DFC9C0617647EC61F9`)
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md). Performance claims need benchmarks.
+Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Links
 
