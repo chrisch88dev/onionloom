@@ -1,0 +1,15 @@
+/target/
+/.codewhale/
+/onionloom
+/onionloom.exe
+/AGENTS.md
+/CLAUDE.md
+/onions/
+/private/
+*.checkpoint
+*.checkpoint.*
+*.profraw
+*.pem
+*.key
+.DS_Store
+Thumbs.db

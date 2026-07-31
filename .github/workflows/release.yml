@@ -1,0 +1,132 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Match tag to Cargo version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          test "$GITHUB_REF_NAME" = "v$version"
+
+  linux:
+    name: Linux x86_64
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - run: target/release/onionloom version
+      - name: Rename binary for release
+        shell: bash
+        run: |
+          cp target/release/onionloom "onionloom-${GITHUB_REF_NAME}-linux-x86_64"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: onionloom-*
+          if-no-files-found: error
+
+  windows:
+    name: Windows x86_64
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - run: target/release/onionloom.exe version
+      - name: Rename binary for release
+        shell: pwsh
+        run: |
+          Copy-Item target/release/onionloom.exe "onionloom-$env:GITHUB_REF_NAME-windows-x86_64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: onionloom-*
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Build both architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+      - name: Create universal binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          lipo -create \
+            target/aarch64-apple-darwin/release/onionloom \
+            target/x86_64-apple-darwin/release/onionloom \
+            -output "onionloom-${GITHUB_REF_NAME}-macos-universal"
+          chmod 0755 "onionloom-${GITHUB_REF_NAME}-macos-universal"
+          lipo -info "onionloom-${GITHUB_REF_NAME}-macos-universal"
+          "./onionloom-${GITHUB_REF_NAME}-macos-universal" version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: onionloom-*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          sha256sum * > SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Onionloom $GITHUB_REF_NAME" \
+              --generate-notes \
+              --verify-tag
+          fi
