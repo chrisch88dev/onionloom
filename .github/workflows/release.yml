@@ -44,7 +44,7 @@ jobs:
           install -m 0755 target/release/onionloom "$package/onionloom"
           install -m 0644 README.md SECURITY.md LICENSE NOTICE "$package/"
           tar -czf "${package}.tar.gz" "$package"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-x86_64
           path: onionloom-*.tar.gz
@@ -67,7 +67,7 @@ jobs:
           Copy-Item target/release/onionloom.exe "$package/onionloom.exe"
           Copy-Item README.md,SECURITY.md,LICENSE,NOTICE $package
           Compress-Archive -Path $package -DestinationPath "$package.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-x86_64
           path: onionloom-*.zip
@@ -103,7 +103,7 @@ jobs:
           "$package/onionloom" version
           install -m 0644 README.md SECURITY.md LICENSE NOTICE "$package/"
           tar -czf "${package}.tar.gz" "$package"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-universal
           path: onionloom-*.tar.gz
