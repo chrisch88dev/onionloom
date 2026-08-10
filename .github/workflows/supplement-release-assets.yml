@@ -290,7 +290,7 @@ jobs:
           file -b "$linux" | grep -Eq '^ELF 64-bit .*x86-64'
           file -b "$windows" | grep -Eq '^PE32\+ executable .*x86-64'
           file -b "$macos" | grep -Fq 'Mach-O universal binary'
-          lipo -verify_arch arm64 x86_64 "$macos"
+          lipo "$macos" -verify_arch arm64 x86_64
           cmp "$macos" mac-package/onionloom
 
       - name: Create and verify complete macOS DMG
