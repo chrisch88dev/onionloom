@@ -1,159 +1,171 @@
 # Onionloom
 
 <p align="center">
-  <strong>The fastest Tor v3 onion vanity address generator.</strong><br>
-  CPU-first, GPU-accelerated, automatic.
+  <strong>High-throughput Tor v3 onion vanity address generation.</strong><br>
+  Measured CPU tuning, validated GPU acceleration, verified key output.
 </p>
 
 <p align="center">
   <a href="https://crates.io/crates/onionloom"><img src="https://img.shields.io/crates/v/onionloom?label=crates.io&color=orange" alt="crates.io"></a>
+  <a href="https://github.com/chrisch88dev/onionloom/actions/workflows/ci.yml"><img src="https://github.com/chrisch88dev/onionloom/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/chrisch88dev/onionloom/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="license"></a>
   <a href="https://github.com/chrisch88dev/onionloom/releases"><img src="https://img.shields.io/github/v/release/chrisch88dev/onionloom?label=release" alt="release"></a>
 </p>
 
----
+Onionloom generates Tor v3 Onion Service addresses with chosen prefixes. It measures supported CPU configurations on the current machine and enables a GPU only after a device self-test and local measurement. Every match is reconstructed on the CPU, then the installed key directory is read back and validated. Searching is local and requires no network connection or configuration file.
 
-Onionloom measures your machine, picks the best CPU configuration, validates compatible GPU hardware, and generates custom `.onion` addresses at full speed. Every result is independently verified before it touches disk. No network, no config files.
+Onionloom is listed in the [Tor Project Onionmine alternatives guide](https://gitlab.torproject.org/tpo/onion-services/onionmine/-/blob/main/docs/alternatives.md). That guide acknowledges available implementations and does not imply endorsement.
 
-## What are .onion addresses?
+## What is an onion address?
 
-`.onion` addresses are Tor v3 onion services, the modern standard for anonymous websites and services on the Tor network. Instead of `something.com`, you get an address like `loom4skeblahblahblahblahblahblahblahblah.onion` that routes all traffic through Tor, hiding both the server and the visitor.
+A Tor v3 Onion Service hostname contains 56 base32 characters followed by `.onion`. It is derived from the service's Ed25519 public key and routes clients to the service through Tor without a public server address.
 
-Onionloom generates the cryptographic key pairs needed to run an onion service. Put the generated files in your Tor daemon's `HiddenServiceDir` and your site is live. You can run anything: a web server, an XMPP chat, a file share, a Bitcoin node.
-
-And with Onionloom, the beginning of that address says whatever you want.
+Onionloom searches valid key pairs until the hostname begins with the text you requested. The generated directory contains the exact key files Tor expects for `HiddenServiceDir`.
 
 ## Why Onionloom
 
-- **Paired-coordinate CPU engine**: one field inversion shared across thousands of candidates. Extremely efficient.
-- **Automatic GPU acceleration**: Vulkan, DirectX 12, or Metal. GPU results are independently verified on CPU before any key is saved.
-- **No unsafe Rust**: zero `unsafe` blocks in the entire codebase.
-- **Live throughput**: expected, median, and 95th percentile time estimates updated in real time.
-- **Exact Tor format**: tagged public key, expanded secret, and hostname with full readback validation.
-- **Never overwrites**: existing key directories are refused, never replaced.
-- **OS randomness**: all secrets from the operating system CSPRNG, zeroized after use.
-- **Resumable checkpoints**: stop and resume long searches (opt-in, secret material warning).
-- **Linux-first**: full Windows and macOS support.
+- **Paired-coordinate CPU engine**: shares one field inversion across a measured candidate batch.
+- **Validated GPU acceleration**: supports Vulkan, DirectX 12, and Metal through `wgpu`, with CPU verification of every GPU result.
+- **Safe Rust policy**: Onionloom's crate forbids unsafe code.
+- **Measured estimates**: reports average, 50 percent, and 95 percent completion estimates from the current hardware and pattern filter.
+- **Exact Tor output**: validates headers, lengths, key relationships, hostname checksum, and final directory contents.
+- **Overwrite protection**: refuses to replace an existing key directory.
+- **Operating-system randomness**: generates seeds through the OS and zeroizes secret buffers.
+- **Resumable searches**: optional checkpoints preserve CPU search progress and are clearly treated as secret material.
+- **Platform releases**: publishes Linux x86_64, Windows x86_64, and universal macOS artifacts.
 
 ## Install
 
-### Pre-built binaries
+### Release archives
 
-Download from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases). Just download and run:
+Download the archive for your platform from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases):
 
-| Platform | File |
-|----------|------|
-| Linux x86_64 | `onionloom-v1.0.0-linux-x86_64` |
-| macOS (Apple Silicon + Intel) | `onionloom-v1.0.0-macos-universal` |
-| Windows x86_64 | `onionloom-v1.0.0-windows-x86_64.exe` |
+| Platform | Release archive |
+|----------|-----------------|
+| Linux x86_64 | `onionloom-vX.Y.Z-linux-x86_64.tar.gz` |
+| macOS, Apple Silicon and Intel | `onionloom-vX.Y.Z-macos-universal.tar.gz` |
+| Windows x86_64 | `onionloom-vX.Y.Z-windows-x86_64.zip` |
 
-These are generic builds compatible with any machine. Verify with the published `SHA256SUMS`.
+Each archive includes the executable, README, changelog, security policy, license, and notice. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
 
-### Build from source (faster)
+Extract the archive, enter its directory, and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
 
-Compiling yourself targets your exact CPU, significantly faster than the generic binaries:
+### Host-optimized Linux build
 
-```
+```console
 git clone https://github.com/chrisch88dev/onionloom
 cd onionloom
 ./build.sh
 ```
 
-`build.sh` enables native CPU instructions, full LTO, and symbol stripping. Linux only.
+`build.sh` creates `./onionloom` with `target-cpu=native`, full LTO, path remapping, and symbol stripping. The result is tuned for the build machine and may not run on an older or different CPU. Use `./build.sh --cpu-only` to omit GPU dependencies.
 
-On macOS or Windows, or CPU-only:
+On macOS and Windows, use Cargo directly:
 
-```
+```console
 cargo build --release --locked
-cargo build --release --locked --no-default-features   # CPU-only
+cargo build --release --locked --no-default-features
 ```
 
-The `--locked` flag pins exact dependency versions from `Cargo.lock`. This gives you the same tested build every time. Always use it for reproducible, reliable binaries.
+The `--locked` option uses the dependency versions in `Cargo.lock`. Compiler, linker, operating-system, and host settings can still change binary output and performance.
 
-### Cargo
+### Cargo install
 
-```
+```console
 cargo install onionloom --locked
 ```
 
-Requires Rust 1.85 or newer.
+Rust 1.85 or newer is required.
 
-## Quick Start
+## Quick start
 
-```
-./onionloom evaluate          # measure this machine
-./onionloom guess loom        # estimate without generating
-./onionloom search loom       # generate a key (output: onions/)
+```console
+./onionloom evaluate
+./onionloom guess loom
+./onionloom search loom
 ./onionloom search loom -d ./keys --count 2
 ./onionloom search loom --continuous -d ./keys
 ./onionloom search longname --gpu off
 ./onionloom search longname --gpu force
 ./onionloom search loom --checkpoint /secure/path/loom.checkpoint
-./onionloom verify            # validate all keys in onions/
-./onionloom verify ./keys/loom...onion
+./onionloom verify
+./onionloom verify ./keys/<56-character-hostname>.onion
 ./onionloom benchmark --power full --trial-ms 500
-./onionloom gpu               # inspect GPU acceleration
+./onionloom gpu
 ```
+
+Examples use a Unix shell. In Windows PowerShell, invoke `./onionloom.exe` from the extracted release directory.
+
+Search stops after one safely saved key by default. Use `--count N` for a fixed number or `--continuous` to keep saving matches until Ctrl-C.
 
 ### Power modes
 
-Control how much CPU Onionloom uses. Default is `full`:
+The default is `full`:
 
-- `low`: leave most CPU free for other work
-- `medium`: balance search and responsiveness
-- `full`: all available cores, no overclocking
+- `low`: leaves most CPU capacity available for other work
+- `medium`: balances search work and responsiveness
+- `full`: uses all available CPU processing slots without changing clock or voltage settings
 
-### Using your key
+## Use the generated key
 
-Generated keys land in the `onions/` directory (or wherever `-d` points). Each match gets its own folder named after the `.onion` address:
+Each match gets its own directory under `onions/`, or under the directory passed with `--output`:
 
+```text
+onions/<56-character-hostname>.onion/
+  hostname
+  hs_ed25519_public_key
+  hs_ed25519_secret_key
 ```
-onions/loom4skeblahblahblah.onion/
-  hostname              # your .onion address
-  hs_ed25519_public_key # public key (Tor tagged format)
-  hs_ed25519_secret_key # secret key (keep this safe)
-```
 
-To run a Tor onion service, point your Tor daemon at the key directory. In `torrc`:
+Keep `hs_ed25519_secret_key` private. Point Tor at the directory in `torrc`:
 
-```
-HiddenServiceDir /path/to/onions/loom4skeblahblahblah.onion
+```text
+HiddenServiceDir /path/to/onions/<56-character-hostname>.onion
 HiddenServicePort 80 127.0.0.1:8080
 ```
 
-Restart Tor and your site is live at that `.onion` address.
+Restart Tor after updating its configuration. Run `onionloom verify` before installing or moving an existing key directory.
 
-## GPU Support
+## GPU support
 
-Onionloom detects compatible GPUs automatically. Every GPU result is independently verified on the CPU before a key is saved. If no compatible GPU is found, search falls back to CPU.
+Onionloom checks feature limits, runs exact arithmetic test vectors, and measures each usable adapter before automatic search enables it. Unsupported, invalid, or unhelpful adapters fall back to the tuned CPU engine. A device model name alone is not enough to determine support, so use `onionloom gpu` for the result on a specific machine.
 
-Requirements: 64-bit integer compute shaders, 128 or more workgroup lanes, sufficient workgroup storage.
+| Platform | Candidate backend |
+|----------|-------------------|
+| Linux | Vulkan |
+| Windows | DirectX 12 or Vulkan |
+| macOS | Metal |
 
-| Platform | Backend | Compatible hardware |
-|----------|---------|---------------------|
-| Linux | Vulkan | NVIDIA (GTX 900+), AMD (GCN 2+), Intel Arc |
-| Windows | DirectX 12 or Vulkan | NVIDIA (GTX 900+), AMD (GCN 2+), Intel Arc |
-| macOS | Metal | Apple Silicon (M1+), AMD, Intel |
+The compute engine requires exact 64-bit integer shaders, at least 128 workgroup lanes, and sufficient workgroup storage. Use `--gpu off` for CPU-only search or `--gpu force` to require a compatible GPU.
 
-Use `--gpu off` for CPU-only or `--gpu force` to require GPU.
+## Performance
+
+`onionloom benchmark` reports complete CPU candidate generation on the current machine. `onionloom gpu` reports complete GPU candidate generation after initialization. Results vary with hardware, drivers, cooling, power policy, compiler flags, and workload.
+
+Use the reproducible comparison protocol in [docs/BENCHMARKING.md](docs/BENCHMARKING.md) before making speed or ranking claims. Architecture details are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Security
 
-Onionloom uses `curve25519-dalek` for all cryptographic operations. Every generated key is independently verified before output. Secret material is zeroized. Keys follow Tor's exact format with readback validation.
+The search engine uses safe Rust field arithmetic. Every possible match is reconstructed with `curve25519-dalek` before output, and the complete installed directory is validated again from disk. Secret material is zeroized where supported and is never intentionally printed.
+
+A recognizable prefix is not proof of identity. Verify the complete 56-character hostname through a trusted channel. See the [Tor Project vanity address guidance](https://community.torproject.org/onion-services/advanced/vanity-addresses/).
 
 To report a vulnerability:
 
 - [GitHub private vulnerability reporting](https://github.com/chrisch88dev/onionloom/security/advisories/new)
-- Email: [chris@chrisch88.dev](mailto:chris@chrisch88.dev) (PGP: `946C571F7423FF1E565EE5DFC9C0617647EC61F9`)
+- [chris@chrisch88.dev](mailto:chris@chrisch88.dev), PGP fingerprint `946C 571F 7423 FF1E 565E E5DF C9C0 6176 47EC 61F9`
+
+See [SECURITY.md](SECURITY.md) for the security model and limits.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
 
 ## Links
 
 - [crates.io](https://crates.io/crates/onionloom)
 - [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases)
+- [Tor Project Onionmine alternatives](https://gitlab.torproject.org/tpo/onion-services/onionmine/-/blob/main/docs/alternatives.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Benchmarking](docs/BENCHMARKING.md)
 

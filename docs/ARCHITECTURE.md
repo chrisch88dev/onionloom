@@ -45,9 +45,9 @@ y(P + Q) = (x1*y1 - x2*y2) / (x1*y2 - y1*x2)
 y(P - Q) = (x1*y1 + x2*y2) / (x1*y2 + y1*x2)
 ```
 
-The paired numerators share precomputed `x2*y2`. Simultaneous field division shares one inversion across the complete block. Sixteen independent prefix-product chains expose multiplication latency to the CPU and are combined before that one inversion. Reused heap buffers keep large batches off thread stacks. The offset table is immutable and shared by all workers, and automatic tuning measures paired batch sizes through 8,192 under the selected worker load.
+The paired numerators share precomputed `x2*y2`. Simultaneous field division shares one inversion across the complete block. Sixteen independent prefix-product chains expose multiplication latency to the CPU and are combined before that one inversion. Offset-table construction and reusable search buffers are heap-backed, so batch-sized data does not depend on platform thread-stack capacity. The completed offset table is immutable and shared by all workers. Automatic tuning builds the largest table once, shares exact prefixes across smaller batch sizes, and measures paired batches through 8,192 under the selected worker load.
 
-The formulas are incomplete when the two odd-order inputs are equal or negatives. Onionloom checks every denominator. If an exceptional block is ever observed, it evaluates that exact range through the complete Dalek path instead of inverting zero or skipping work. Generated clamped scalars make this unreachable in the current `u64` offset domain, but the fallback preserves the invariant explicitly.
+The formulas are incomplete when the two odd-order inputs are equal or negatives. Onionloom checks every denominator. Exceptional inputs are not expected during normal bounded searches, but correctness does not depend on that expectation. If an exceptional block is observed, Onionloom evaluates that exact range through the complete Dalek path instead of inverting zero or skipping work.
 
 Only the compressed y coordinate is needed in the hot loop. Byte 31 bit 7 stores the x sign and affects prefix character 50. The y-only prefilter clears that one bit for 50 and 51 character patterns, then complete CPU reconstruction resolves the rare prehit without false negatives.
 

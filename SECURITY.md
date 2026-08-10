@@ -4,7 +4,7 @@ Onionloom handles long-lived Tor identity keys. Treat generated secret files and
 
 ## Report a vulnerability
 
-Use GitHub private vulnerability reporting for `chrisch88dev/onionloom`. Do not open a public issue or include real keys. Include the affected commit, operating system, minimal reproduction, observed behavior, and impact.
+Use [GitHub private vulnerability reporting](https://github.com/chrisch88dev/onionloom/security/advisories/new) or email [chris@chrisch88.dev](mailto:chris@chrisch88.dev), PGP fingerprint `946C 571F 7423 FF1E 565E E5DF C9C0 6176 47EC 61F9`. Do not open a public issue or include real keys. Include the affected commit, operating system, minimal reproduction, observed behavior, and impact.
 
 ## Key protections
 

@@ -56,18 +56,17 @@ pub fn auto_tune(
     let logical = std::thread::available_parallelism()?.get();
     let worker_limit = logical.min(max_workers);
 
-    let mut batch_measurements = Vec::with_capacity(BatchSize::ALL.len());
-    let mut tables = Vec::with_capacity(BatchSize::ALL.len());
-    for batch_size in BatchSize::ALL {
-        let table = OffsetTable::new(batch_size.get())?;
+    let batch_sizes = BatchSize::ALL;
+    let tables = OffsetTable::shared(&batch_sizes.map(BatchSize::get))?;
+    let mut batch_measurements = Vec::with_capacity(batch_sizes.len());
+    for (batch_size, table) in batch_sizes.into_iter().zip(&tables) {
         batch_measurements.push(measure_with_table(
             worker_limit,
             batch_size,
             per_trial,
             filters.clone(),
-            Arc::clone(&table),
+            Arc::clone(table),
         )?);
-        tables.push(table);
     }
     let best_batch_index = batch_measurements
         .iter()

@@ -1,10 +1,10 @@
 [package]
 name = "onionloom"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["chrisch88dev <chris@chrisch88.dev>"]
-description = "The fastest Tor v3 onion vanity address generator with automatic CPU and GPU tuning"
+description = "Tor v3 onion vanity address generator with automatic CPU and GPU tuning"
 license = "Apache-2.0"
 repository = "https://github.com/chrisch88dev/onionloom"
 homepage = "https://chrisch88.dev"

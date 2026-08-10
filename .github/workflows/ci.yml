@@ -29,13 +29,48 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --all-targets --locked
+      - run: cargo test --all-targets --all-features --locked
+      - run: cargo test --all-targets --no-default-features --locked
       - run: cargo build --release --locked
+      - name: Smoke release binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary=target/release/onionloom
+          smoke_directory=$(mktemp -d "${RUNNER_TEMP}/onionloom-smoke.XXXXXX")
+          trap 'rm -rf -- "$smoke_directory"' EXIT
+          "$binary" evaluate --power low --trial-ms 25
+          "$binary" guess test --power low --trial-ms 25
+          "$binary" benchmark --workers 1 --batch-size 8192 --trial-ms 25
+          "$binary" search aa --gpu off --workers 1 --batch-size 64 --tune-ms 25 \
+            --output "$smoke_directory/keys" --quiet
+          "$binary" verify "$smoke_directory/keys"
+      - name: Smoke release binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $binary = './target/release/onionloom.exe'
+          $smokeDirectory = Join-Path $env:RUNNER_TEMP ("onionloom-smoke-" + [guid]::NewGuid())
+          try {
+            & $binary evaluate --power low --trial-ms 25
+            & $binary guess test --power low --trial-ms 25
+            & $binary benchmark --workers 1 --batch-size 8192 --trial-ms 25
+            & $binary search aa --gpu off --workers 1 --batch-size 64 --tune-ms 25 `
+              --output (Join-Path $smokeDirectory 'keys') --quiet
+            & $binary verify (Join-Path $smokeDirectory 'keys')
+          } finally {
+            if (Test-Path -LiteralPath $smokeDirectory) {
+              Remove-Item -LiteralPath $smokeDirectory -Recurse -Force
+            }
+          }
 
   cpu-only:
     name: CPU-only build
@@ -45,6 +80,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --all-targets --locked --no-default-features
       - run: cargo build --release --locked --no-default-features
+
+  msrv:
+    name: Rust 1.85 minimum version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - run: cargo check --all-targets --all-features --locked
+      - run: cargo check --all-targets --no-default-features --locked
 
   audit:
     name: dependency audit
