@@ -20,7 +20,7 @@
 
 ### Distribution
 
-- Release archives now include the executable, license, notice, README, changelog, and security policy.
+- Release archives now include the executable, license, notice, README, changelog, security policy, contribution guide, and project documentation.
 - Clarified portable and host-optimized build instructions, GPU runtime requirements, benchmark discipline, and cross-platform invocation.
 
 ## 1.0.0 -- 2026-07-31

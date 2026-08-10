@@ -1,7 +1,7 @@
 # Onionloom
 
 <p align="center">
-  <strong>High-throughput Tor v3 onion vanity address generation.</strong><br>
+  <strong>Tor v3 onion vanity address generation.</strong><br>
   Measured CPU tuning, validated GPU acceleration, verified key output.
 </p>
 
@@ -46,7 +46,7 @@ Download the archive for your platform from [GitHub Releases](https://github.com
 | macOS, Apple Silicon and Intel | `onionloom-vX.Y.Z-macos-universal.tar.gz` |
 | Windows x86_64 | `onionloom-vX.Y.Z-windows-x86_64.zip` |
 
-Each archive includes the executable, README, changelog, security policy, license, and notice. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
+Each archive includes the executable, project documentation, changelog, security policy, contribution guide, license, and notice. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
 
 Extract the archive, enter its directory, and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
 

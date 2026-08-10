@@ -53,7 +53,8 @@ jobs:
           package="onionloom-${GITHUB_REF_NAME}-linux-x86_64"
           mkdir "$package"
           cp target/release/onionloom "$package/onionloom"
-          cp LICENSE NOTICE README.md SECURITY.md CHANGELOG.md "$package/"
+          cp LICENSE NOTICE README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md "$package/"
+          cp -R docs "$package/docs"
           tar -czf "${package}.tar.gz" "$package"
       - uses: actions/upload-artifact@v4
         with:
@@ -94,7 +95,8 @@ jobs:
           $package = "onionloom-$env:GITHUB_REF_NAME-windows-x86_64"
           New-Item -ItemType Directory -Path $package | Out-Null
           Copy-Item target/release/onionloom.exe (Join-Path $package 'onionloom.exe')
-          Copy-Item LICENSE,NOTICE,README.md,SECURITY.md,CHANGELOG.md -Destination $package
+          Copy-Item LICENSE,NOTICE,README.md,SECURITY.md,CHANGELOG.md,CONTRIBUTING.md -Destination $package
+          Copy-Item docs -Destination (Join-Path $package 'docs') -Recurse
           Compress-Archive -Path $package -DestinationPath "$package.zip"
       - uses: actions/upload-artifact@v4
         with:
@@ -147,7 +149,8 @@ jobs:
           binary="$package"
           mkdir package-staging
           mv "$binary" package-staging/onionloom
-          cp LICENSE NOTICE README.md SECURITY.md CHANGELOG.md package-staging/
+          cp LICENSE NOTICE README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md package-staging/
+          cp -R docs package-staging/docs
           mv package-staging "$package"
           tar -czf "${package}.tar.gz" "$package"
       - uses: actions/upload-artifact@v4
