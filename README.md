@@ -48,7 +48,7 @@ Download your preferred format from [GitHub Releases](https://github.com/chrisch
 
 Each complete package includes the executable, project documentation, changelog, security policy, contribution guide, license, project notice, adapted-work notice, dependency license bundle, and Rust standard-library notices from the build toolchain. The DMG contains the same macOS package contents. Executable-only downloads are byte-for-byte copies of the binaries inside their corresponding packages.
 
-Verify every download against the release's `SHA256SUMS`. Executable-only Linux and macOS downloads need `chmod 0755 FILE` before use because direct HTTP downloads do not preserve executable permissions. The macOS artifacts are not Developer ID signed or notarized, so Gatekeeper may require explicit approval after checksum verification. The Windows executable is not Authenticode signed, so SmartScreen may show a warning. When redistributing an executable-only download, include the legal and attribution files from its complete package.
+Verify each package or executable against the release's `SHA256SUMS`. Executable-only Linux and macOS downloads need `chmod 0755 FILE` before use because direct HTTP downloads do not preserve executable permissions. The macOS artifacts are not Developer ID signed or notarized, so Gatekeeper may require explicit approval after checksum verification. The Windows executable is not Authenticode signed, so SmartScreen may show a warning. When redistributing an executable-only download, include the legal and attribution files from its complete package.
 
 After extracting a package, enter its directory and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
 

@@ -180,6 +180,27 @@ jobs:
             -format UDZO \
             -ov "release-assets/${asset}.dmg"
           hdiutil verify "release-assets/${asset}.dmg"
+
+          mount_directory=$(mktemp -d "${RUNNER_TEMP}/onionloom-dmg.XXXXXX")
+          mounted=false
+          cleanup() {
+            if [[ "$mounted" == true ]]; then
+              hdiutil detach "$mount_directory" || true
+            fi
+            rmdir "$mount_directory" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -readonly -nobrowse \
+            -mountpoint "$mount_directory" "release-assets/${asset}.dmg" >/dev/null
+          mounted=true
+          while IFS= read -r -d '' source; do
+            relative="${source#"$package"/}"
+            test -f "$mount_directory/$relative"
+            cmp "$source" "$mount_directory/$relative"
+          done < <(find "$package" -type f -print0)
+          hdiutil detach "$mount_directory"
+          mounted=false
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-universal
@@ -202,6 +223,7 @@ jobs:
         run: |
           set -euo pipefail
           cd artifacts
+          export LC_ALL=C
           sha256sum * > SHA256SUMS
       - name: Publish release
         env:
