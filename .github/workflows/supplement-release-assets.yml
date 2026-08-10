@@ -1,0 +1,574 @@
+name: prepare v1.0.1 supplemental assets
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-v1.0.1-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: v1.0.1
+
+jobs:
+  prepare:
+    name: Prepare exact binaries and DMG
+    runs-on: macos-latest
+    outputs:
+      release_id: ${{ steps.metadata.outputs.release_id }}
+      tag_object_sha: ${{ steps.metadata.outputs.tag_object_sha }}
+      target_commit: ${{ steps.metadata.outputs.target_commit }}
+      linux_archive_sha: ${{ steps.sources.outputs.linux_archive_sha }}
+      macos_archive_sha: ${{ steps.sources.outputs.macos_archive_sha }}
+      windows_archive_sha: ${{ steps.sources.outputs.windows_archive_sha }}
+    steps:
+      - name: Validate release and signed tag metadata
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid stable release tag: $tag" >&2
+            exit 1
+          fi
+
+          mkdir -p metadata downloads candidates mac-package
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >metadata/release.json
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >metadata/tag-ref.json
+
+          release_id=$(jq -er '.id' metadata/release.json)
+          test "$(jq -r '.tag_name' metadata/release.json)" = "$tag"
+          test "$(jq -r '.draft' metadata/release.json)" = false
+          test "$(jq -r '.prerelease' metadata/release.json)" = false
+          test "$(jq -r '.immutable' metadata/release.json)" = false
+
+          test "$(jq -r '.object.type' metadata/tag-ref.json)" = tag
+          tag_object_sha=$(jq -er '.object.sha' metadata/tag-ref.json)
+          gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object_sha" \
+            >metadata/annotated-tag.json
+          test "$(jq -r '.tag' metadata/annotated-tag.json)" = "$tag"
+          test "$(jq -r '.object.type' metadata/annotated-tag.json)" = commit
+          test "$(jq -r '.verification.verified' metadata/annotated-tag.json)" = true
+          target_commit=$(jq -er '.object.sha' metadata/annotated-tag.json)
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          release = json.loads(Path("metadata/release.json").read_text())
+          required = {
+              f"onionloom-{tag}-linux-x86_64.tar.gz",
+              f"onionloom-{tag}-macos-universal.tar.gz",
+              f"onionloom-{tag}-windows-x86_64.zip",
+              "SHA256SUMS",
+          }
+          supplemental = {
+              f"onionloom-{tag}-linux-x86_64",
+              f"onionloom-{tag}-macos-universal",
+              f"onionloom-{tag}-macos-universal.dmg",
+              f"onionloom-{tag}-windows-x86_64.exe",
+          }
+          names = [asset["name"] for asset in release["assets"]]
+          if len(names) != len(set(names)):
+              raise SystemExit("release contains duplicate asset names")
+          unexpected = set(names) - required - supplemental
+          if unexpected:
+              raise SystemExit(f"release contains unexpected assets: {sorted(unexpected)}")
+          missing = required - set(names)
+          if missing:
+              raise SystemExit(f"release is missing required assets: {sorted(missing)}")
+          PY
+
+          {
+            echo "release_id=$release_id"
+            echo "tag_object_sha=$tag_object_sha"
+            echo "target_commit=$target_commit"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Download original release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          assets=(
+            "onionloom-${tag}-linux-x86_64.tar.gz"
+            "onionloom-${tag}-macos-universal.tar.gz"
+            "onionloom-${tag}-windows-x86_64.zip"
+            "SHA256SUMS"
+          )
+          for asset in "${assets[@]}"; do
+            gh release download "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$asset" \
+              --dir downloads
+          done
+
+      - name: Verify source checksums and release digests
+        id: sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          release = json.loads(Path("metadata/release.json").read_text())
+          assets = {asset["name"]: asset for asset in release["assets"]}
+          manifest_path = Path("downloads/SHA256SUMS")
+          lines = manifest_path.read_text(encoding="utf-8").splitlines()
+          pattern = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._+-]+)")
+          manifest = {}
+          for line in lines:
+              match = pattern.fullmatch(line)
+              if match is None:
+                  raise SystemExit(f"invalid SHA256SUMS line: {line!r}")
+              digest, name = match.groups()
+              if name in manifest:
+                  raise SystemExit(f"duplicate SHA256SUMS entry: {name}")
+              manifest[name] = digest
+
+          live_names = set(assets) - {"SHA256SUMS"}
+          if set(manifest) != live_names:
+              raise SystemExit("SHA256SUMS does not cover the exact live asset set")
+          for name, digest in manifest.items():
+              if assets[name].get("digest") != f"sha256:{digest}":
+                  raise SystemExit(f"release digest does not match SHA256SUMS: {name}")
+
+          downloaded = {
+              f"onionloom-{tag}-linux-x86_64.tar.gz",
+              f"onionloom-{tag}-macos-universal.tar.gz",
+              f"onionloom-{tag}-windows-x86_64.zip",
+              "SHA256SUMS",
+          }
+          for name in downloaded:
+              data = (Path("downloads") / name).read_bytes()
+              digest = hashlib.sha256(data).hexdigest()
+              if assets[name].get("digest") != f"sha256:{digest}":
+                  raise SystemExit(f"downloaded asset digest mismatch: {name}")
+          PY
+
+          tag="$RELEASE_TAG"
+          linux_archive="downloads/onionloom-${tag}-linux-x86_64.tar.gz"
+          macos_archive="downloads/onionloom-${tag}-macos-universal.tar.gz"
+          windows_archive="downloads/onionloom-${tag}-windows-x86_64.zip"
+          {
+            echo "linux_archive_sha=$(shasum -a 256 "$linux_archive" | cut -d ' ' -f 1)"
+            echo "macos_archive_sha=$(shasum -a 256 "$macos_archive" | cut -d ' ' -f 1)"
+            echo "windows_archive_sha=$(shasum -a 256 "$windows_archive" | cut -d ' ' -f 1)"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Extract only validated package members
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import shutil
+          import tarfile
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          tag = os.environ["RELEASE_TAG"]
+          linux = f"onionloom-{tag}-linux-x86_64"
+          macos = f"onionloom-{tag}-macos-universal"
+          windows = f"onionloom-{tag}-windows-x86_64"
+          size_limit = 256 * 1024 * 1024
+
+          def copy_tar_member(archive_path, member_name, destination):
+              with tarfile.open(archive_path, "r:gz") as archive:
+                  matches = [member for member in archive.getmembers()
+                             if member.name == member_name]
+                  if len(matches) != 1 or not matches[0].isfile():
+                      raise SystemExit(f"expected one regular member: {member_name}")
+                  member = matches[0]
+                  if member.size <= 0 or member.size > size_limit:
+                      raise SystemExit(f"invalid member size: {member_name}")
+                  source = archive.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f"could not read member: {member_name}")
+                  with source, Path(destination).open("xb") as output:
+                      shutil.copyfileobj(source, output)
+
+          copy_tar_member(
+              f"downloads/{linux}.tar.gz",
+              f"{linux}/onionloom",
+              f"candidates/{linux}",
+          )
+
+          with zipfile.ZipFile(f"downloads/{windows}.zip") as archive:
+              matches = [info for info in archive.infolist()
+                         if info.filename == f"{windows}/onionloom.exe"]
+              if len(matches) != 1 or matches[0].is_dir():
+                  raise SystemExit("expected one regular Windows executable member")
+              if matches[0].file_size <= 0 or matches[0].file_size > size_limit:
+                  raise SystemExit("invalid Windows executable size")
+              with archive.open(matches[0]) as source, \
+                      Path(f"candidates/{windows}.exe").open("xb") as output:
+                  shutil.copyfileobj(source, output)
+
+          archive_path = f"downloads/{macos}.tar.gz"
+          destination_root = Path("mac-package")
+          seen = set()
+          with tarfile.open(archive_path, "r:gz") as archive:
+              members = archive.getmembers()
+              if len(members) > 4096:
+                  raise SystemExit("macOS package has too many members")
+              total_size = 0
+              for member in members:
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"unsafe macOS package path: {member.name}")
+                  if not path.parts or path.parts[0] != macos:
+                      raise SystemExit(f"unexpected macOS package root: {member.name}")
+                  if member.name in seen:
+                      raise SystemExit(f"duplicate macOS package member: {member.name}")
+                  seen.add(member.name)
+                  if not member.isdir() and not member.isfile():
+                      raise SystemExit(f"unsupported macOS package member: {member.name}")
+                  total_size += member.size
+                  if member.size > size_limit or total_size > size_limit:
+                      raise SystemExit("macOS package exceeds the extraction limit")
+
+              for member in members:
+                  relative_parts = PurePosixPath(member.name).parts[1:]
+                  if not relative_parts:
+                      continue
+                  destination = destination_root.joinpath(*relative_parts)
+                  if member.isdir():
+                      destination.mkdir(parents=True, exist_ok=True)
+                      continue
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  source = archive.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f"could not read member: {member.name}")
+                  with source, destination.open("xb") as output:
+                      shutil.copyfileobj(source, output)
+                  destination.chmod(0o755 if relative_parts == ("onionloom",) else 0o644)
+
+          required_package_files = {
+              "onionloom",
+              "LICENSE",
+              "NOTICE",
+              "THIRD_PARTY_NOTICES.md",
+              "THIRD_PARTY_LICENSES.html",
+              "RUST_COPYRIGHT.html",
+              "README.md",
+              "SECURITY.md",
+              "CHANGELOG.md",
+              "CONTRIBUTING.md",
+              "docs/ARCHITECTURE.md",
+              "docs/BENCHMARKING.md",
+          }
+          missing = {name for name in required_package_files
+                     if not (destination_root / name).is_file()}
+          if missing:
+              raise SystemExit(f"macOS package is incomplete: {sorted(missing)}")
+
+          shutil.copyfile("mac-package/onionloom", f"candidates/{macos}")
+          Path(f"candidates/{linux}").chmod(0o755)
+          Path(f"candidates/{macos}").chmod(0o755)
+          PY
+
+          tag="$RELEASE_TAG"
+          linux="candidates/onionloom-${tag}-linux-x86_64"
+          windows="candidates/onionloom-${tag}-windows-x86_64.exe"
+          macos="candidates/onionloom-${tag}-macos-universal"
+          file -b "$linux" | grep -Eq '^ELF 64-bit .*x86-64'
+          file -b "$windows" | grep -Eq '^PE32\+ executable .*x86-64'
+          file -b "$macos" | grep -Fq 'Mach-O universal binary'
+          lipo -verify_arch arm64 x86_64 "$macos"
+          cmp "$macos" mac-package/onionloom
+
+      - name: Create and verify complete macOS DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          version="${tag#v}"
+          macos="onionloom-${tag}-macos-universal"
+          dmg="candidates/${macos}.dmg"
+
+          hdiutil create \
+            -volname "Onionloom $version" \
+            -srcfolder mac-package \
+            -fs HFS+ \
+            -format UDZO \
+            -ov "$dmg"
+          hdiutil verify "$dmg"
+
+          mount_directory=$(mktemp -d "${RUNNER_TEMP}/onionloom-dmg.XXXXXX")
+          mounted=false
+          cleanup() {
+            if [[ "$mounted" == true ]]; then
+              hdiutil detach "$mount_directory" || true
+            fi
+            rmdir "$mount_directory" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -readonly -nobrowse \
+            -mountpoint "$mount_directory" "$dmg" >/dev/null
+          mounted=true
+          while IFS= read -r -d '' source; do
+            relative="${source#mac-package/}"
+            test -f "$mount_directory/$relative"
+            cmp "$source" "$mount_directory/$relative"
+          done < <(find mac-package -type f -print0)
+          hdiutil detach "$mount_directory"
+          mounted=false
+
+      - name: Transfer verified candidates
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supplemental-release-assets
+          path: candidates/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Disabled publisher
+    if: github.event_name != 'pull_request'
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+      TAG_OBJECT_SHA: ${{ needs.prepare.outputs.tag_object_sha }}
+      TARGET_COMMIT: ${{ needs.prepare.outputs.target_commit }}
+      LINUX_ARCHIVE_SHA: ${{ needs.prepare.outputs.linux_archive_sha }}
+      MACOS_ARCHIVE_SHA: ${{ needs.prepare.outputs.macos_archive_sha }}
+      WINDOWS_ARCHIVE_SHA: ${{ needs.prepare.outputs.windows_archive_sha }}
+    steps:
+      - name: Receive verified candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: supplemental-release-assets
+          path: candidates
+
+      - name: Recheck release identity and source packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid stable release tag: $tag" >&2
+            exit 1
+          fi
+
+          mkdir metadata
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >metadata/release.json
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >metadata/tag-ref.json
+          test "$(jq -r '.id' metadata/release.json)" = "$RELEASE_ID"
+          test "$(jq -r '.tag_name' metadata/release.json)" = "$tag"
+          test "$(jq -r '.draft' metadata/release.json)" = false
+          test "$(jq -r '.prerelease' metadata/release.json)" = false
+          test "$(jq -r '.immutable' metadata/release.json)" = false
+          test "$(jq -r '.object.type' metadata/tag-ref.json)" = tag
+          test "$(jq -r '.object.sha' metadata/tag-ref.json)" = "$TAG_OBJECT_SHA"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          release = json.loads(Path("metadata/release.json").read_text())
+          assets = release["assets"]
+          names = [asset["name"] for asset in assets]
+          if len(names) != len(set(names)):
+              raise SystemExit("release contains duplicate asset names")
+          by_name = {asset["name"]: asset for asset in assets}
+          archive_hashes = {
+              f"onionloom-{tag}-linux-x86_64.tar.gz": os.environ["LINUX_ARCHIVE_SHA"],
+              f"onionloom-{tag}-macos-universal.tar.gz": os.environ["MACOS_ARCHIVE_SHA"],
+              f"onionloom-{tag}-windows-x86_64.zip": os.environ["WINDOWS_ARCHIVE_SHA"],
+          }
+          required = set(archive_hashes) | {"SHA256SUMS"}
+          supplemental = {
+              f"onionloom-{tag}-linux-x86_64",
+              f"onionloom-{tag}-macos-universal",
+              f"onionloom-{tag}-macos-universal.dmg",
+              f"onionloom-{tag}-windows-x86_64.exe",
+          }
+          unexpected = set(names) - required - supplemental
+          if unexpected:
+              raise SystemExit(f"release contains unexpected assets: {sorted(unexpected)}")
+          missing = required - set(names)
+          if missing:
+              raise SystemExit(f"release is missing required assets: {sorted(missing)}")
+          for name, digest in archive_hashes.items():
+              if by_name[name].get("digest") != f"sha256:{digest}":
+                  raise SystemExit(f"source package changed during preparation: {name}")
+
+          expected_candidates = supplemental
+          actual_candidates = {path.name for path in Path("candidates").iterdir()
+                               if path.is_file()}
+          if actual_candidates != expected_candidates:
+              raise SystemExit("transferred candidate set is not exact")
+          PY
+
+      - name: Publish exact assets and replace checksums safely
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          linux="onionloom-${tag}-linux-x86_64"
+          macos="onionloom-${tag}-macos-universal"
+          windows="onionloom-${tag}-windows-x86_64.exe"
+
+          asset_digest() {
+            local name="$1"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" |
+              jq -r --arg name "$name" \
+                '.assets[] | select(.name == $name) | .digest' |
+              head -n 1
+          }
+
+          asset_id() {
+            local name="$1"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" |
+              jq -r --arg name "$name" \
+                '.assets[] | select(.name == $name) | .id' |
+              head -n 1
+          }
+
+          wait_for_digest() {
+            local name="$1"
+            local expected="$2"
+            local actual=""
+            for _ in $(seq 1 15); do
+              actual=$(asset_digest "$name")
+              if [[ "$actual" == "sha256:$expected" ]]; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo "Release digest did not stabilize for $name: $actual" >&2
+            return 1
+          }
+
+          ensure_asset() {
+            local path="$1"
+            local name
+            local expected
+            local actual
+            name=$(basename "$path")
+            expected=$(sha256sum "$path" | cut -d ' ' -f 1)
+            actual=$(asset_digest "$name")
+            if [[ -n "$actual" ]]; then
+              if [[ "$actual" != "sha256:$expected" ]]; then
+                echo "Refusing to replace different existing asset: $name" >&2
+                return 1
+              fi
+              return 0
+            fi
+            gh release upload "$tag" "$path" --repo "$GITHUB_REPOSITORY"
+            wait_for_digest "$name" "$expected"
+          }
+
+          ensure_asset "candidates/$linux"
+          ensure_asset "candidates/$macos"
+          ensure_asset "candidates/${macos}.dmg"
+          ensure_asset "candidates/$windows"
+
+          linux_sha=$(sha256sum "candidates/$linux" | cut -d ' ' -f 1)
+          macos_sha=$(sha256sum "candidates/$macos" | cut -d ' ' -f 1)
+          dmg_sha=$(sha256sum "candidates/${macos}.dmg" | cut -d ' ' -f 1)
+          windows_sha=$(sha256sum "candidates/$windows" | cut -d ' ' -f 1)
+          {
+            printf '%s  %s\n' "$linux_sha" "$linux"
+            printf '%s  %s\n' "$LINUX_ARCHIVE_SHA" "${linux}.tar.gz"
+            printf '%s  %s\n' "$macos_sha" "$macos"
+            printf '%s  %s\n' "$dmg_sha" "${macos}.dmg"
+            printf '%s  %s\n' "$MACOS_ARCHIVE_SHA" "${macos}.tar.gz"
+            printf '%s  %s\n' "$windows_sha" "$windows"
+            printf '%s  %s\n' "$WINDOWS_ARCHIVE_SHA" \
+              "onionloom-${tag}-windows-x86_64.zip"
+          } >candidates/SHA256SUMS
+
+          checksum_sha=$(sha256sum candidates/SHA256SUMS | cut -d ' ' -f 1)
+          recovery="${RUNNER_TEMP}/SHA256SUMS.recovery"
+          cp candidates/SHA256SUMS "$recovery"
+          test -z "$(asset_digest SHA256SUMS.recovery)"
+          gh release upload "$tag" "$recovery" --repo "$GITHUB_REPOSITORY"
+          wait_for_digest SHA256SUMS.recovery "$checksum_sha"
+
+          previous_checksum_id=$(asset_id SHA256SUMS)
+          test -n "$previous_checksum_id"
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/releases/assets/$previous_checksum_id"
+          ensure_asset candidates/SHA256SUMS
+
+          mkdir remote
+          gh release download "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS \
+            --dir remote
+          cmp candidates/SHA256SUMS remote/SHA256SUMS
+
+          recovery_id=$(asset_id SHA256SUMS.recovery)
+          test -n "$recovery_id"
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/releases/assets/$recovery_id"
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >metadata/final-release.json
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          release = json.loads(Path("metadata/final-release.json").read_text())
+          assets = {asset["name"]: asset for asset in release["assets"]}
+          expected_names = {
+              f"onionloom-{tag}-linux-x86_64",
+              f"onionloom-{tag}-linux-x86_64.tar.gz",
+              f"onionloom-{tag}-macos-universal",
+              f"onionloom-{tag}-macos-universal.dmg",
+              f"onionloom-{tag}-macos-universal.tar.gz",
+              f"onionloom-{tag}-windows-x86_64.exe",
+              f"onionloom-{tag}-windows-x86_64.zip",
+              "SHA256SUMS",
+          }
+          if set(assets) != expected_names:
+              raise SystemExit("final release asset set is not exact")
+          line_pattern = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._+-]+)")
+          for line in Path("candidates/SHA256SUMS").read_text().splitlines():
+              match = line_pattern.fullmatch(line)
+              if match is None:
+                  raise SystemExit("generated checksum manifest is invalid")
+              digest, name = match.groups()
+              if assets[name].get("digest") != f"sha256:{digest}":
+                  raise SystemExit(f"final release digest mismatch: {name}")
+          PY
+
+          current_tag_object=$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')
+          test "$current_tag_object" = "$TAG_OBJECT_SHA"
+
+          {
+            echo "Added four supplemental assets to $tag."
+            echo ""
+            echo "The signed tag still resolves to \`$TARGET_COMMIT\`."
+            echo "Every live release asset is covered by the new \`SHA256SUMS\`."
+          } >>"$GITHUB_STEP_SUMMARY"

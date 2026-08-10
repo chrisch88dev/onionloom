@@ -29,7 +29,7 @@ GPU changes must pass exact startup and overflow-replay tests. Report initializa
 
 ## Platform changes
 
-Linux is the primary performance platform. Keep portable Rust paths building on Windows and macOS. Changes to release packaging must preserve the three tagged archives and `SHA256SUMS`. Do not weaken the CPU-only build.
+Linux is the primary performance platform. Keep portable Rust paths building on Windows and macOS. Changes to release packaging must preserve the three complete archives, direct executables, macOS DMG, and `SHA256SUMS`. Do not weaken the CPU-only build.
 
 ## Safety
 

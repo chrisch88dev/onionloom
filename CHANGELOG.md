@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Distribution
+
+- Future GitHub releases publish direct Linux, Windows, and universal macOS executables plus a macOS DMG alongside the complete archives.
+
 ## 1.0.1 -- 2026-08-10
 
 ### Fixed

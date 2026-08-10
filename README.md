@@ -36,19 +36,21 @@ Onionloom searches valid key pairs until the hostname begins with the text you r
 
 ## Install
 
-### Release archives
+### Release downloads
 
-Download the archive for your platform from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases):
+Download your preferred format from [GitHub Releases](https://github.com/chrisch88dev/onionloom/releases). The complete packages are recommended for most users:
 
-| Platform | Release archive |
-|----------|-----------------|
-| Linux x86_64 | `onionloom-vX.Y.Z-linux-x86_64.tar.gz` |
-| macOS, Apple Silicon and Intel | `onionloom-vX.Y.Z-macos-universal.tar.gz` |
-| Windows x86_64 | `onionloom-vX.Y.Z-windows-x86_64.zip` |
+| Platform | Complete package | Executable only |
+|----------|------------------|-----------------|
+| Linux x86_64 | `onionloom-vX.Y.Z-linux-x86_64.tar.gz` | `onionloom-vX.Y.Z-linux-x86_64` |
+| macOS, Apple Silicon and Intel | `.dmg` or `.tar.gz` for `onionloom-vX.Y.Z-macos-universal` | `onionloom-vX.Y.Z-macos-universal` |
+| Windows x86_64 | `onionloom-vX.Y.Z-windows-x86_64.zip` | `onionloom-vX.Y.Z-windows-x86_64.exe` |
 
-Each archive includes the executable, project documentation, changelog, security policy, contribution guide, license, project notice, adapted-work notice, dependency license bundle, and Rust standard-library notices from the build toolchain. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
+Each complete package includes the executable, project documentation, changelog, security policy, contribution guide, license, project notice, adapted-work notice, dependency license bundle, and Rust standard-library notices from the build toolchain. The DMG contains the same macOS package contents. Executable-only downloads are byte-for-byte copies of the binaries inside their corresponding packages.
 
-Extract the archive, enter its directory, and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
+Verify every download against the release's `SHA256SUMS`. Executable-only Linux and macOS downloads need `chmod 0755 FILE` before use because direct HTTP downloads do not preserve executable permissions. The macOS artifacts are not Developer ID signed or notarized, so Gatekeeper may require explicit approval after checksum verification. The Windows executable is not Authenticode signed, so SmartScreen may show a warning. When redistributing an executable-only download, include the legal and attribution files from its complete package.
+
+After extracting a package, enter its directory and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
 
 ### Host-optimized Linux build
 
