@@ -50,19 +50,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          package="onionloom-${GITHUB_REF_NAME}-linux-x86_64"
-          mkdir "$package"
+          asset="onionloom-${GITHUB_REF_NAME}-linux-x86_64"
+          package="package-staging/$asset"
+          mkdir -p release-assets "$package"
+          cp target/release/onionloom "release-assets/$asset"
+          chmod 0755 "release-assets/$asset"
           cp target/release/onionloom "$package/onionloom"
           cp LICENSE NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.html README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md "$package/"
           rust_copyright="$(rustc --print sysroot)/share/doc/rust/COPYRIGHT-library.html"
           test -f "$rust_copyright"
           cp "$rust_copyright" "$package/RUST_COPYRIGHT.html"
           cp -R docs "$package/docs"
-          tar -czf "${package}.tar.gz" "$package"
-      - uses: actions/upload-artifact@v4
+          tar -C package-staging -czf "release-assets/${asset}.tar.gz" "$asset"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-x86_64
-          path: onionloom-*.tar.gz
+          path: release-assets/*
           if-no-files-found: error
 
   windows:
@@ -95,8 +98,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $package = "onionloom-$env:GITHUB_REF_NAME-windows-x86_64"
+          $asset = "onionloom-$env:GITHUB_REF_NAME-windows-x86_64"
+          $releaseAssets = 'release-assets'
+          $package = Join-Path 'package-staging' $asset
+          New-Item -ItemType Directory -Path $releaseAssets,'package-staging' | Out-Null
           New-Item -ItemType Directory -Path $package | Out-Null
+          Copy-Item target/release/onionloom.exe (Join-Path $releaseAssets "$asset.exe")
           Copy-Item target/release/onionloom.exe (Join-Path $package 'onionloom.exe')
           Copy-Item LICENSE,NOTICE,THIRD_PARTY_NOTICES.md,THIRD_PARTY_LICENSES.html,README.md,SECURITY.md,CHANGELOG.md,CONTRIBUTING.md -Destination $package
           $rustCopyright = Join-Path (rustc --print sysroot) 'share/doc/rust/COPYRIGHT-library.html'
@@ -105,11 +112,11 @@ jobs:
           }
           Copy-Item $rustCopyright (Join-Path $package 'RUST_COPYRIGHT.html')
           Copy-Item docs -Destination (Join-Path $package 'docs') -Recurse
-          Compress-Archive -Path $package -DestinationPath "$package.zip"
-      - uses: actions/upload-artifact@v4
+          Compress-Archive -Path $package -DestinationPath (Join-Path $releaseAssets "$asset.zip")
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-x86_64
-          path: onionloom-*.zip
+          path: release-assets/*
           if-no-files-found: error
 
   macos:
@@ -131,17 +138,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir release-assets
           lipo -create \
             target/aarch64-apple-darwin/release/onionloom \
             target/x86_64-apple-darwin/release/onionloom \
-            -output "onionloom-${GITHUB_REF_NAME}-macos-universal"
-          chmod 0755 "onionloom-${GITHUB_REF_NAME}-macos-universal"
-          lipo -info "onionloom-${GITHUB_REF_NAME}-macos-universal"
+            -output "release-assets/onionloom-${GITHUB_REF_NAME}-macos-universal"
+          chmod 0755 "release-assets/onionloom-${GITHUB_REF_NAME}-macos-universal"
+          lipo -info "release-assets/onionloom-${GITHUB_REF_NAME}-macos-universal"
       - name: Smoke release binary
         shell: bash
         run: |
           set -euo pipefail
-          binary="./onionloom-${GITHUB_REF_NAME}-macos-universal"
+          binary="./release-assets/onionloom-${GITHUB_REF_NAME}-macos-universal"
           smoke_directory=$(mktemp -d "${RUNNER_TEMP}/onionloom-release.XXXXXX")
           trap 'rm -rf -- "$smoke_directory"' EXIT
           "$binary" evaluate --power low --trial-ms 25
@@ -153,21 +161,50 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          package="onionloom-${GITHUB_REF_NAME}-macos-universal"
-          binary="$package"
-          mkdir package-staging
-          mv "$binary" package-staging/onionloom
-          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.html README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md package-staging/
+          asset="onionloom-${GITHUB_REF_NAME}-macos-universal"
+          version="${GITHUB_REF_NAME#v}"
+          binary="release-assets/$asset"
+          package="package-staging/$asset"
+          mkdir -p "$package"
+          cp "$binary" "$package/onionloom"
+          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.html README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md "$package/"
           rust_copyright="$(rustc --print sysroot)/share/doc/rust/COPYRIGHT-library.html"
           test -f "$rust_copyright"
-          cp "$rust_copyright" package-staging/RUST_COPYRIGHT.html
-          cp -R docs package-staging/docs
-          mv package-staging "$package"
-          tar -czf "${package}.tar.gz" "$package"
-      - uses: actions/upload-artifact@v4
+          cp "$rust_copyright" "$package/RUST_COPYRIGHT.html"
+          cp -R docs "$package/docs"
+          tar -C package-staging -czf "release-assets/${asset}.tar.gz" "$asset"
+          hdiutil create \
+            -volname "Onionloom $version" \
+            -srcfolder "$package" \
+            -fs HFS+ \
+            -format UDZO \
+            -ov "release-assets/${asset}.dmg"
+          hdiutil verify "release-assets/${asset}.dmg"
+
+          mount_directory=$(mktemp -d "${RUNNER_TEMP}/onionloom-dmg.XXXXXX")
+          mounted=false
+          cleanup() {
+            if [[ "$mounted" == true ]]; then
+              hdiutil detach "$mount_directory" || true
+            fi
+            rmdir "$mount_directory" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -readonly -nobrowse \
+            -mountpoint "$mount_directory" "release-assets/${asset}.dmg" >/dev/null
+          mounted=true
+          while IFS= read -r -d '' source; do
+            relative="${source#"$package"/}"
+            test -f "$mount_directory/$relative"
+            cmp "$source" "$mount_directory/$relative"
+          done < <(find "$package" -type f -print0)
+          hdiutil detach "$mount_directory"
+          mounted=false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-universal
-          path: onionloom-*.tar.gz
+          path: release-assets/*
           if-no-files-found: error
 
   publish:
@@ -177,7 +214,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
           merge-multiple: true
@@ -186,6 +223,7 @@ jobs:
         run: |
           set -euo pipefail
           cd artifacts
+          export LC_ALL=C
           sha256sum * > SHA256SUMS
       - name: Publish release
         env:
