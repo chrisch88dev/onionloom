@@ -511,9 +511,7 @@ fn save_resume_state(
 }
 
 fn remove_completed_checkpoint(path: Option<&Path>) -> Result<()> {
-    if let Some(path) = path
-        && path.exists()
-    {
+    if let Some(path) = path.filter(|path| path.exists()) {
         std::fs::remove_file(path)
             .with_context(|| format!("failed to remove completed checkpoint {}", path.display()))?;
     }

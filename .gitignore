@@ -6,6 +6,7 @@
 /CLAUDE.md
 /onions/
 /private/
+/release-pkg/
 *.checkpoint
 *.checkpoint.*
 *.profraw

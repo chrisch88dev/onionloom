@@ -15,31 +15,43 @@ use super::point::{AffinePoint, ExtendedPoint};
 /// Reusable affine multiples of the cofactored Ed25519 base point.
 pub(crate) struct OffsetTable {
     batch_size: usize,
-    points: Box<[AffinePoint]>,
+    points: Arc<[AffinePoint]>,
 }
 
 impl OffsetTable {
     /// Builds the shared table for an even candidate batch size.
     pub(crate) fn new(batch_size: usize) -> Result<Arc<Self>> {
+        let offset_count = checked_offset_count(batch_size)?;
+        let points = Arc::from(build_offsets(offset_count)?);
+        Ok(Arc::new(Self { batch_size, points }))
+    }
+
+    /// Builds one largest table and shares its prefixes across tuning sizes.
+    pub(crate) fn shared(batch_sizes: &[usize]) -> Result<Vec<Arc<Self>>> {
         ensure!(
-            batch_size > 0 && batch_size % 2 == 0,
-            "symmetry batch size must be positive and even"
+            !batch_sizes.is_empty(),
+            "at least one symmetry batch size is required"
         );
-        let points = match batch_size / 2 {
-            32 => build_offsets::<32>()?,
-            64 => build_offsets::<64>()?,
-            128 => build_offsets::<128>()?,
-            256 => build_offsets::<256>()?,
-            512 => build_offsets::<512>()?,
-            1024 => build_offsets::<1024>()?,
-            2048 => build_offsets::<2048>()?,
-            4096 => build_offsets::<4096>()?,
-            _ => anyhow::bail!("unsupported symmetry batch size {batch_size}"),
-        };
-        Ok(Arc::new(Self {
-            batch_size,
-            points: points.into_boxed_slice(),
-        }))
+        let offset_counts = batch_sizes
+            .iter()
+            .copied()
+            .map(checked_offset_count)
+            .collect::<Result<Vec<_>>>()?;
+        let largest = *offset_counts
+            .iter()
+            .max()
+            .expect("validated batch sizes are non-empty");
+        let points = Arc::from(build_offsets(largest)?);
+        Ok(batch_sizes
+            .iter()
+            .copied()
+            .map(|batch_size| {
+                Arc::new(Self {
+                    batch_size,
+                    points: Arc::clone(&points),
+                })
+            })
+            .collect())
     }
 
     /// Returns the number of paired candidates, excluding the center.
@@ -116,7 +128,7 @@ impl SymmetryEngine {
         let half = batch_size / 2;
         let next_center_projective = self.center.to_extended().add(self.stride);
 
-        for (index, offset) in self.table.points.iter().enumerate() {
+        for (index, offset) in self.table.points[..half].iter().enumerate() {
             let x1_y2 = self.center.x.multiply(offset.y);
             let y1_x2 = self.center.y.multiply(offset.x);
             self.numerators[index] = self.center.xy.subtract(offset.xy);
@@ -200,6 +212,17 @@ impl SymmetryEngine {
     }
 }
 
+fn checked_offset_count(batch_size: usize) -> Result<usize> {
+    ensure!(
+        batch_size > 0 && batch_size % 2 == 0,
+        "symmetry batch size must be positive and even"
+    );
+    match batch_size / 2 {
+        count @ (32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096) => Ok(count),
+        _ => anyhow::bail!("unsupported symmetry batch size {batch_size}"),
+    }
+}
+
 fn simultaneous_division<const CHAINS: usize>(
     numerators: &[FieldElement],
     denominators: &[FieldElement],
@@ -253,15 +276,17 @@ fn simultaneous_division<const CHAINS: usize>(
     }
 }
 
-fn build_offsets<const N: usize>() -> Result<Vec<AffinePoint>> {
+fn build_offsets(count: usize) -> Result<Vec<AffinePoint>> {
     let step = EdwardsPoint::mul_base(&Scalar::from(8_u64));
     let mut point = step;
-    let points: [EdwardsPoint; N] = std::array::from_fn(|_| {
-        let output = point;
+    let mut points = Vec::with_capacity(count);
+    for _ in 0..count {
+        points.push(point);
         point += step;
-        output
-    });
-    EdwardsPoint::compress_batch(&points)
+    }
+    let compressed = EdwardsPoint::compress_batch_alloc(&points);
+    drop(points);
+    compressed
         .into_iter()
         .map(|compressed| AffinePoint::decompress(compressed.to_bytes()))
         .collect()
@@ -270,6 +295,9 @@ fn build_offsets<const N: usize>() -> Result<Vec<AffinePoint>> {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    use curve25519_dalek::{EdwardsPoint, Scalar};
 
     use crate::crypto::keys::ExpandedSecret;
 
@@ -356,5 +384,29 @@ mod tests {
             observed.keys().copied().collect::<Vec<_>>(),
             (SEARCH_START..SEARCH_START + candidate_count).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn largest_offset_table_builds_on_a_one_mebibyte_stack() {
+        std::thread::Builder::new()
+            .name("small-stack-offset-table".to_owned())
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let tables = OffsetTable::shared(&[64, 8192]).expect("shared tuning offset tables");
+                let table = &tables[1];
+                assert_eq!(table.batch_size(), 8192);
+                assert!(Arc::ptr_eq(&tables[0].points, &table.points));
+                for index in [0, 2047, 4095] {
+                    let multiple = 8 * (u64::try_from(index).expect("index fits u64") + 1);
+                    let expected = EdwardsPoint::mul_base(&Scalar::from(multiple));
+                    assert_eq!(
+                        table.points[index].compress(),
+                        expected.compress().to_bytes()
+                    );
+                }
+            })
+            .expect("small-stack test thread")
+            .join()
+            .expect("offset table construction must not overflow its stack");
     }
 }

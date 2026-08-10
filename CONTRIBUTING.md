@@ -14,6 +14,7 @@ cargo deny check
 ```
 
 Search, key, output, or checkpoint changes also need a release search followed by `onionloom verify`.
+Platform fixes need release-mode CLI smoke coverage on the affected operating system. Exercise automatic tuning, the largest CPU batch, a short CPU-only search, and saved-key verification. Test GPU search only when a compatible adapter is available.
 
 ## Performance changes
 

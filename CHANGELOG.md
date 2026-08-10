@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.1 -- 2026-08-10
+
+### Fixed
+
+- Moved large Ed25519 offset-table construction buffers to the heap, fixing the immediate `STATUS_STACK_OVERFLOW` failure in CPU-backed commands on Windows x86_64 ([#8](https://github.com/chrisch88dev/onionloom/issues/8)).
+- Preserved exact offset ordering and batch compression while replacing eight fixed-array builder variants with one size-checked runtime builder.
+- Restored compatibility with the advertised Rust 1.85 minimum by removing syntax stabilized after that compiler release.
+
+### Validation
+
+- Added a regression test that constructs and checks the largest offset table on a 1 MiB thread stack.
+- Added release-mode CLI smoke tests for evaluation, estimation, maximum-batch CPU measurement, search, and saved-key verification on Linux, Windows, Apple Silicon macOS, and Intel macOS.
+- Added a Rust 1.85 minimum-version build check and both GPU-enabled and CPU-only tests across supported operating systems.
+
+### Performance
+
+- Automatic tuning now builds the largest immutable offset table once and shares its exact prefixes across every measured batch size instead of rebuilding common points.
+
+### Distribution
+
+- Release archives now include the executable, license, notice, README, changelog, and security policy.
+- Clarified portable and host-optimized build instructions, GPU runtime requirements, benchmark discipline, and cross-platform invocation.
+
 ## 1.0.0 -- 2026-07-31
 
 First public release.
@@ -35,6 +58,6 @@ First public release.
 
 ### Platform
 
-- Linux-first with full Windows and macOS builds.
+- Linux-first with Linux x86_64, Windows x86_64, and universal macOS release artifacts.
 - Linux host-optimized release script (`build.sh`): target-cpu=native, LTO, stripped.
 - Tagged release packaging with SHA-256 checksums.
