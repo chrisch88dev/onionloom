@@ -46,7 +46,7 @@ Download the archive for your platform from [GitHub Releases](https://github.com
 | macOS, Apple Silicon and Intel | `onionloom-vX.Y.Z-macos-universal.tar.gz` |
 | Windows x86_64 | `onionloom-vX.Y.Z-windows-x86_64.zip` |
 
-Each archive includes the executable, project documentation, changelog, security policy, contribution guide, license, project notice, and third-party notices. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
+Each archive includes the executable, project documentation, changelog, security policy, contribution guide, license, project notice, adapted-work notice, dependency license bundle, and Rust standard-library notices from the build toolchain. Verify the archive against the release's `SHA256SUMS` before extracting it. These portable builds do not use host-specific CPU flags, so choose the archive matching your operating system and architecture.
 
 Extract the archive, enter its directory, and run `./onionloom help` on Linux or macOS. In Windows PowerShell, run `./onionloom.exe help`.
 
@@ -171,4 +171,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
 
 ## License
 
-[Apache License 2.0](LICENSE). Copyright (c) 2026 chrisch88dev and Onionloom contributors. Required attribution for third-party work is retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Apache License 2.0](LICENSE). Copyright (c) 2026 chrisch88dev and Onionloom contributors. Required attribution for adapted work is retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and dependency license texts are bundled in [THIRD_PARTY_LICENSES.html](THIRD_PARTY_LICENSES.html).

@@ -97,6 +97,15 @@ jobs:
       - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2.85.10
         with:
-          tool: cargo-deny
+          tool: cargo-deny,cargo-about@0.9.1
           fallback: none
       - run: cargo deny check
+      - name: Check dependency license bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated="$RUNNER_TEMP/THIRD_PARTY_LICENSES.html"
+          cargo about generate --locked --all-features --fail \
+            --output-file "$generated" about.hbs
+          LC_ALL=C sed -i 's/[[:blank:]]*$//' "$generated"
+          cmp THIRD_PARTY_LICENSES.html "$generated"

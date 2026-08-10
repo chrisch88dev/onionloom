@@ -11,7 +11,12 @@ cargo test --all-targets --all-features
 cargo test --all-targets --no-default-features
 cargo build --release --locked
 cargo deny check
+cargo about generate --locked --all-features --fail --output-file /tmp/onionloom-licenses.html about.hbs
+LC_ALL=C sed -i 's/[[:blank:]]*$//' /tmp/onionloom-licenses.html
+cmp THIRD_PARTY_LICENSES.html /tmp/onionloom-licenses.html
 ```
+
+Use `cargo-about` 0.9.1 when regenerating the dependency license bundle. Update and commit the bundle whenever `Cargo.lock`, license policy, release targets, or linked features change.
 
 Search, key, output, or checkpoint changes also need a release search followed by `onionloom verify`.
 Platform fixes need release-mode CLI smoke coverage on the affected operating system. Exercise automatic tuning, the largest CPU batch, a short CPU-only search, and saved-key verification. Test GPU search only when a compatible adapter is available.

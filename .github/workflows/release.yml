@@ -53,7 +53,10 @@ jobs:
           package="onionloom-${GITHUB_REF_NAME}-linux-x86_64"
           mkdir "$package"
           cp target/release/onionloom "$package/onionloom"
-          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md "$package/"
+          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.html README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md "$package/"
+          rust_copyright="$(rustc --print sysroot)/share/doc/rust/COPYRIGHT-library.html"
+          test -f "$rust_copyright"
+          cp "$rust_copyright" "$package/RUST_COPYRIGHT.html"
           cp -R docs "$package/docs"
           tar -czf "${package}.tar.gz" "$package"
       - uses: actions/upload-artifact@v4
@@ -95,7 +98,12 @@ jobs:
           $package = "onionloom-$env:GITHUB_REF_NAME-windows-x86_64"
           New-Item -ItemType Directory -Path $package | Out-Null
           Copy-Item target/release/onionloom.exe (Join-Path $package 'onionloom.exe')
-          Copy-Item LICENSE,NOTICE,THIRD_PARTY_NOTICES.md,README.md,SECURITY.md,CHANGELOG.md,CONTRIBUTING.md -Destination $package
+          Copy-Item LICENSE,NOTICE,THIRD_PARTY_NOTICES.md,THIRD_PARTY_LICENSES.html,README.md,SECURITY.md,CHANGELOG.md,CONTRIBUTING.md -Destination $package
+          $rustCopyright = Join-Path (rustc --print sysroot) 'share/doc/rust/COPYRIGHT-library.html'
+          if (-not (Test-Path -LiteralPath $rustCopyright)) {
+            throw "Rust standard-library copyright file not found: $rustCopyright"
+          }
+          Copy-Item $rustCopyright (Join-Path $package 'RUST_COPYRIGHT.html')
           Copy-Item docs -Destination (Join-Path $package 'docs') -Recurse
           Compress-Archive -Path $package -DestinationPath "$package.zip"
       - uses: actions/upload-artifact@v4
@@ -149,7 +157,10 @@ jobs:
           binary="$package"
           mkdir package-staging
           mv "$binary" package-staging/onionloom
-          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md package-staging/
+          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.html README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md package-staging/
+          rust_copyright="$(rustc --print sysroot)/share/doc/rust/COPYRIGHT-library.html"
+          test -f "$rust_copyright"
+          cp "$rust_copyright" package-staging/RUST_COPYRIGHT.html
           cp -R docs package-staging/docs
           mv package-staging "$package"
           tar -czf "${package}.tar.gz" "$package"

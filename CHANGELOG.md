@@ -20,7 +20,7 @@
 
 ### Distribution
 
-- Release archives now include the executable, license, project and third-party notices, README, changelog, security policy, contribution guide, and project documentation.
+- Release archives now include the executable, license, project and adapted-work notices, generated dependency license bundle, Rust standard-library notices from the build toolchain, README, changelog, security policy, contribution guide, and project documentation.
 - Clarified portable and host-optimized build instructions, GPU runtime requirements, benchmark discipline, and cross-platform invocation.
 
 ## 1.0.0 -- 2026-07-31

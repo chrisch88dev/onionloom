@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onionloom third-party licenses</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 2rem auto; max-width: 70rem; padding: 0 1rem; }
+    pre { border: 1px solid #bbb; overflow-x: auto; padding: 1rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Onionloom third-party licenses</h1>
+  <p>This document contains license texts selected for Onionloom release binaries and their linked Rust dependencies.</p>
+  <h2>License overview</h2>
+  <ul>
+    {{#each overview}}
+    <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+    {{/each}}
+  </ul>
+  <h2>License texts and packages</h2>
+  {{#each licenses}}
+  <section>
+    {{#if first_of_kind}}<h3 id="{{id}}">{{name}}</h3>{{/if}}
+    <h4>{{name}}</h4>
+    <p>Used by:</p>
+    <ul>
+      {{#each used_by}}
+      <li><a href="{{#if crate.repository}}{{crate.repository}}{{else}}https://crates.io/crates/{{crate.name}}{{/if}}">{{crate.name}} {{crate.version}}</a></li>
+      {{/each}}
+    </ul>
+    <pre>{{text}}</pre>
+  </section>
+  {{/each}}
+</body>
+</html>
