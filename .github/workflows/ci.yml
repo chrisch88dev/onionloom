@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.100.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - run: cargo check --all-targets --all-features --locked
       - run: cargo check --all-targets --no-default-features --locked
 
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2.85.13
+      - uses: taiki-e/install-action@v2.87.5
         with:
           tool: cargo-deny,cargo-about@0.9.1
           fallback: none
