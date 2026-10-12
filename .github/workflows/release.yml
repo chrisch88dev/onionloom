@@ -62,7 +62,7 @@ jobs:
           cp "$rust_copyright" "$package/RUST_COPYRIGHT.html"
           cp -R docs "$package/docs"
           tar -C package-staging -czf "release-assets/${asset}.tar.gz" "$asset"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-x86_64
           path: release-assets/*
@@ -113,7 +113,7 @@ jobs:
           Copy-Item $rustCopyright (Join-Path $package 'RUST_COPYRIGHT.html')
           Copy-Item docs -Destination (Join-Path $package 'docs') -Recurse
           Compress-Archive -Path $package -DestinationPath (Join-Path $releaseAssets "$asset.zip")
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-x86_64
           path: release-assets/*
@@ -201,7 +201,7 @@ jobs:
           done < <(find "$package" -type f -print0)
           hdiutil detach "$mount_directory"
           mounted=false
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-universal
           path: release-assets/*
@@ -214,7 +214,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           merge-multiple: true
